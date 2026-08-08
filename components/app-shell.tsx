@@ -68,7 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => setCollapsed((v) => !v)}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={cn(
-              "grid size-7 shrink-0 place-items-center rounded-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+              "grid size-7 shrink-0 cursor-pointer place-items-center rounded-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
               collapsed && "mx-auto"
             )}
           >

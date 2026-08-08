@@ -34,11 +34,20 @@ function PlanCard({
 }) {
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect(plan.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(plan.id);
+        }
+      }}
       className={cn(
-        "relative flex flex-col rounded-none border p-4",
+        "relative flex cursor-pointer flex-col rounded-none border p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
         plan.highlight
           ? "border border-accent-primary/40 bg-accent-primary/5"
-          : "border-border bg-card"
+          : "border-border bg-card hover:border-[#383838]"
       )}
     >
       {plan.highlight && (

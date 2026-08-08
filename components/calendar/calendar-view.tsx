@@ -243,7 +243,7 @@ export function CalendarView() {
                         key={ev.id}
                         onClick={() => setSelectedId(ev.id)}
                         className={cn(
-                          "w-full rounded-none border border-border bg-muted/20 px-3 py-2.5 text-left transition-colors hover:border-[#383838]",
+                          "w-full cursor-pointer rounded-none border border-border bg-muted/20 px-3 py-2.5 text-left transition-colors hover:border-[#383838]",
                           selectedId === ev.id && "border-[#383838] bg-muted/40"
                         )}
                       >
@@ -321,7 +321,7 @@ function EventChip({
       onClick={onClick}
       data-selected={selected}
       className={cn(
-        "group w-full rounded-none border px-2.5 py-2 text-left transition-all",
+        "group w-full cursor-pointer rounded-none border px-2.5 py-2 text-left transition-all",
         meta.chip,
         selected && "ring-1 ring-foreground/20"
       )}

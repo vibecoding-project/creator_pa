@@ -540,7 +540,7 @@ function InboxList({
               key={email.id}
               onClick={() => onSelect(email.id)}
               className={cn(
-                "group border-b border-[#333333]/70 bg-[#121212] px-5 py-4 text-left transition-colors",
+                "group cursor-pointer border-b border-[#333333]/70 bg-[#121212] px-5 py-4 text-left transition-colors",
                 selected
                   ? "bg-[#282828]"
                   : "hover:bg-[#1e1e1e]"
@@ -609,10 +609,10 @@ function InboxList({
 type ActionState = "idle" | "approved" | "edited" | "declined";
 
 const ACTION_BUTTON =
-  "flex h-12 w-full items-center justify-center gap-2 border border-[#383838] bg-[#222222] text-sm font-bold text-[#f0f0f0] transition-colors hover:border-[#444444] hover:bg-[#2e2e2e] active:scale-[0.99]";
+  "flex h-12 w-full cursor-pointer items-center justify-center gap-2 border border-[#383838] bg-[#222222] text-sm font-bold text-[#f0f0f0] transition-colors hover:border-[#444444] hover:bg-[#2e2e2e] active:scale-[0.99]";
 
 const APPROVE_BUTTON =
-  "flex h-12 w-full items-center justify-center gap-2 border border-accent-primary bg-accent-primary text-sm font-bold text-accent-primary-contrast transition-colors hover:border-accent-primary-strong hover:bg-accent-primary-strong active:scale-[0.99]";
+  "flex h-12 w-full cursor-pointer items-center justify-center gap-2 border border-accent-primary bg-accent-primary text-sm font-bold text-accent-primary-contrast transition-colors hover:border-accent-primary-strong hover:bg-accent-primary-strong active:scale-[0.99]";
 
 function ActionDetail({
   email,
@@ -659,7 +659,7 @@ function ActionDetail({
         <p className="text-xs text-[#a0a0a0]">{text}</p>
         <button
           onClick={() => onAction("idle")}
-          className="mt-1 text-[11px] font-semibold text-[#a0a0a0] transition-colors hover:text-[#f0f0f0]"
+          className="mt-1 cursor-pointer text-[11px] font-semibold text-[#a0a0a0] transition-colors hover:text-[#f0f0f0]"
         >
           Back to review
         </button>

@@ -1,34 +1,95 @@
--- Create Profiles Table
-CREATE TABLE IF NOT EXISTS public.profiles (
-  id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
-  full_name TEXT,
-  avatar_url TEXT,
-  selected_theme TEXT DEFAULT 'emerald',
-  created_at TIMESTAMPTZ DEFAULT NOW()
+create table if not exists public.profiles (
+  id uuid primary key references auth.users (id) on delete cascade,
+  full_name text,
+  avatar_url text,
+  selected_theme text not null default 'emerald',
+  created_at timestamptz not null default now()
 );
 
--- Enable RLS on Profiles
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view own profile" 
-ON public.profiles FOR SELECT USING (auth.uid() = id);
-
-CREATE POLICY "Users can update own profile" 
-ON public.profiles FOR UPDATE USING (auth.uid() = id);
-
--- Create Sponsorship Deals Table
-CREATE TABLE IF NOT EXISTS public.sponsorship_deals (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL,
-  brand_name TEXT NOT NULL,
-  deal_amount NUMERIC NOT NULL DEFAULT 0,
-  status TEXT CHECK (status IN ('INBOX', 'IN_PROGRESS', 'CLOSED_WIN', 'DECLINED')) DEFAULT 'INBOX',
-  badge_type TEXT CHECK (badge_type IN ('HIGH BUDGET', 'NEEDS INFO', 'GIFTING')) DEFAULT 'NEEDS INFO',
-  created_at TIMESTAMPTZ DEFAULT NOW()
+create table if not exists public.sponsorship_deals (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  brand_name text not null,
+  deal_amount integer not null default 0,
+  status text not null default 'INBOX'
+    check (status in ('INBOX', 'IN_PROGRESS', 'CLOSED_WIN', 'DECLINED')),
+  badge_type text
+    check (badge_type in ('HIGH BUDGET', 'NEEDS INFO', 'GIFTING')),
+  created_at timestamptz not null default now()
 );
 
--- Enable RLS on Sponsorship Deals
-ALTER TABLE public.sponsorship_deals ENABLE ROW LEVEL SECURITY;
+create index if not exists sponsorship_deals_user_id_idx
+  on public.sponsorship_deals (user_id);
 
-CREATE POLICY "Users can manage own deals" 
-ON public.sponsorship_deals FOR ALL USING (auth.uid() = user_id);
+create index if not exists sponsorship_deals_created_at_idx
+  on public.sponsorship_deals (created_at desc);
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.profiles (id)
+  values (new.id);
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+alter table public.profiles enable row level security;
+alter table public.sponsorship_deals enable row level security;
+
+drop policy if exists "profiles_select_own" on public.profiles;
+create policy "profiles_select_own"
+  on public.profiles
+  for select
+  using (auth.uid() = id);
+
+drop policy if exists "profiles_insert_own" on public.profiles;
+create policy "profiles_insert_own"
+  on public.profiles
+  for insert
+  with check (auth.uid() = id);
+
+drop policy if exists "profiles_update_own" on public.profiles;
+create policy "profiles_update_own"
+  on public.profiles
+  for update
+  using (auth.uid() = id)
+  with check (auth.uid() = id);
+
+drop policy if exists "profiles_delete_own" on public.profiles;
+create policy "profiles_delete_own"
+  on public.profiles
+  for delete
+  using (auth.uid() = id);
+
+drop policy if exists "deals_select_own" on public.sponsorship_deals;
+create policy "deals_select_own"
+  on public.sponsorship_deals
+  for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "deals_insert_own" on public.sponsorship_deals;
+create policy "deals_insert_own"
+  on public.sponsorship_deals
+  for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "deals_update_own" on public.sponsorship_deals;
+create policy "deals_update_own"
+  on public.sponsorship_deals
+  for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "deals_delete_own" on public.sponsorship_deals;
+create policy "deals_delete_own"
+  on public.sponsorship_deals
+  for delete
+  using (auth.uid() = user_id);

@@ -115,7 +115,7 @@ export function SettingsView() {
                   onClick={() => setAccent(p.id)}
                   aria-pressed={active}
                   aria-label={`Set accent to ${p.name}`}
-                  className="group flex w-14 flex-col items-center gap-1.5"
+                  className="group flex w-14 cursor-pointer flex-col items-center gap-1.5"
                 >
                   <span
                     className={cn(

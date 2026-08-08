@@ -158,7 +158,7 @@ export function InboxView() {
                   onClick={() => setFilter(f.id)}
                   data-active={filter === f.id}
                   className={cn(
-                    "flex h-7 shrink-0 items-center gap-1.5 rounded-none px-2.5 text-xs font-medium transition-colors",
+                    "flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-none px-2.5 text-xs font-medium transition-colors",
                     filter === f.id
                       ? "bg-accent-primary-soft text-foreground"
                       : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
@@ -262,7 +262,7 @@ function EmailListItem({
       onClick={onClick}
       data-active={active}
       className={cn(
-        "group w-full border-b border-border/60 px-3 py-3 text-left transition-colors",
+        "group w-full cursor-pointer border-b border-border/60 px-3 py-3 text-left transition-colors",
         active ? "bg-muted/60" : "hover:bg-muted/30"
       )}
     >
@@ -471,7 +471,7 @@ function EmailDetail({
             </p>
             <button
               onClick={() => setRecIndex((i) => (i + 1) % REC_POOL.length)}
-              className="flex items-center gap-1 rounded-none px-1.5 py-0.5 text-[11px] text-[#a0a0a0] transition-colors hover:bg-[#282828] hover:text-[#f0f0f0]"
+              className="flex cursor-pointer items-center gap-1 rounded-none px-1.5 py-0.5 text-[11px] text-[#a0a0a0] transition-colors hover:bg-[#282828] hover:text-[#f0f0f0]"
             >
               <RefreshCw className="size-3" />
               Regenerate
@@ -530,7 +530,7 @@ function EmailDetail({
                   setEditing(true);
                   draftRef.current?.focus();
                 }}
-                className="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                className="cursor-pointer text-[11px] text-muted-foreground transition-colors hover:text-foreground"
               >
                 Edit draft
               </button>
@@ -551,7 +551,7 @@ function EmailDetail({
                 </p>
                 <button
                   onClick={() => setDraft(email.aiDraft)}
-                  className="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                  className="cursor-pointer text-[11px] text-muted-foreground transition-colors hover:text-foreground"
                 >
                   Reset to AI version
                 </button>

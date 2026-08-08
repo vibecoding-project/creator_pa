@@ -15,6 +15,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createDeal, updateDealStatus } from "@/app/actions/deals";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -23,7 +24,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
-  deals as seedDeals,
   STAGES,
   STAGE_ORDER,
   PLATFORM_META,
@@ -80,11 +80,18 @@ function formatCurrency(value: number) {
 
 /* ------------------------------------------------------------------ */
 
-export function DealsView({ autoOpenNew }: { autoOpenNew: boolean }) {
+export function DealsView({
+  autoOpenNew,
+  initialDeals,
+}: {
+  autoOpenNew: boolean;
+  initialDeals: Deal[];
+}) {
   const router = useRouter();
-  const [deals, setDeals] = useState<Deal[]>(seedDeals);
+  const [deals, setDeals] = useState<Deal[]>(initialDeals);
   const [view, setView] = useState<"board" | "table">("board");
   const [dialogOpen, setDialogOpen] = useState(autoOpenNew);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const stats = useMemo(() => {
     const active = deals.filter((d) => d.stage !== "completed");
@@ -116,9 +123,22 @@ export function DealsView({ autoOpenNew }: { autoOpenNew: boolean }) {
           : d
       )
     );
+    void updateDealStatus(id, stage, statusForStage(stage));
   };
 
-  const addDeal = (deal: Deal) => setDeals((prev) => [deal, ...prev]);
+  const addDeal = async (deal: Deal) => {
+    setDeals((prev) => [deal, ...prev]);
+    const created = await createDeal({
+      brand: deal.brand,
+      value: deal.value,
+      stage: deal.stage,
+      deadline: deal.deadline,
+      deliverables: deal.deliverables,
+    });
+    setDeals((prev) =>
+      prev.map((d) => (d.id === deal.id ? created : d))
+    );
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -139,7 +159,7 @@ export function DealsView({ autoOpenNew }: { autoOpenNew: boolean }) {
               data-active={view === "board"}
               aria-label="Board view"
               className={cn(
-                "grid size-7 place-items-center rounded-none transition-colors",
+                "grid size-7 cursor-pointer place-items-center rounded-none transition-colors",
                 view === "board"
                   ? "bg-muted text-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -152,7 +172,7 @@ export function DealsView({ autoOpenNew }: { autoOpenNew: boolean }) {
               data-active={view === "table"}
               aria-label="Table view"
               className={cn(
-                "grid size-7 place-items-center rounded-none transition-colors",
+                "grid size-7 cursor-pointer place-items-center rounded-none transition-colors",
                 view === "table"
                   ? "bg-muted text-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -197,9 +217,19 @@ export function DealsView({ autoOpenNew }: { autoOpenNew: boolean }) {
       {/* Body */}
       <div className="min-h-0 flex-1 border-t border-border px-6 pt-4 pb-4">
         {view === "board" ? (
-          <Board deals={deals} onMove={moveDeal} />
+          <Board
+            deals={deals}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onMove={moveDeal}
+          />
         ) : (
-          <TableView deals={deals} onMove={moveDeal} />
+          <TableView
+            deals={deals}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onMove={moveDeal}
+          />
         )}
       </div>
 
@@ -245,7 +275,17 @@ function Stat({
 
 /* ------------------------------- Board ------------------------------ */
 
-function Board({ deals, onMove }: { deals: Deal[]; onMove: (id: string, s: DealStage) => void }) {
+function Board({
+  deals,
+  selectedId,
+  onSelect,
+  onMove,
+}: {
+  deals: Deal[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onMove: (id: string, s: DealStage) => void;
+}) {
   return (
     <div className="flex h-full gap-4 overflow-x-auto pb-2 scrollbar-slim">
       {STAGES.map((stage) => {
@@ -276,7 +316,13 @@ function Board({ deals, onMove }: { deals: Deal[]; onMove: (id: string, s: DealS
                 </div>
               ) : (
                 columnDeals.map((deal) => (
-                  <DealCard key={deal.id} deal={deal} onMove={onMove} />
+                  <DealCard
+                    key={deal.id}
+                    deal={deal}
+                    selected={deal.id === selectedId}
+                    onSelect={onSelect}
+                    onMove={onMove}
+                  />
                 ))
               )}
             </div>
@@ -287,13 +333,30 @@ function Board({ deals, onMove }: { deals: Deal[]; onMove: (id: string, s: DealS
   );
 }
 
-function DealCard({ deal, onMove }: { deal: Deal; onMove: (id: string, s: DealStage) => void }) {
+function DealCard({
+  deal,
+  selected,
+  onSelect,
+  onMove,
+}: {
+  deal: Deal;
+  selected: boolean;
+  onSelect: (id: string) => void;
+  onMove: (id: string, s: DealStage) => void;
+}) {
   const platform = PLATFORM_META[deal.platform];
   const idx = STAGE_ORDER.indexOf(deal.stage);
   const next = STAGE_ORDER[idx + 1];
 
   return (
-    <div className="group rounded-none border border-border bg-card p-3 transition-all hover:border-[#383838]">
+    <div
+      onClick={() => onSelect(deal.id)}
+      data-selected={selected}
+      className={cn(
+        "group cursor-pointer rounded-none border border-border bg-card p-3 transition-all hover:border-[#383838]",
+        selected && "ring-1 ring-foreground/20"
+      )}
+    >
       <div className="flex items-center gap-2.5">
         <div className="grid size-8 shrink-0 place-items-center rounded-none bg-[#333333] text-[11px] font-bold text-[#f0f0f0]">
           {deal.initials}
@@ -370,7 +433,17 @@ function DealCard({ deal, onMove }: { deal: Deal; onMove: (id: string, s: DealSt
 
 /* ------------------------------- Table ------------------------------ */
 
-function TableView({ deals, onMove }: { deals: Deal[]; onMove: (id: string, s: DealStage) => void }) {
+function TableView({
+  deals,
+  selectedId,
+  onSelect,
+  onMove,
+}: {
+  deals: Deal[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onMove: (id: string, s: DealStage) => void;
+}) {
   return (
     <div className="h-full overflow-auto rounded-none border border-border scrollbar-slim">
       <table className="w-full border-collapse text-[13px]">
@@ -389,7 +462,15 @@ function TableView({ deals, onMove }: { deals: Deal[]; onMove: (id: string, s: D
           {deals.map((deal) => {
             const platform = PLATFORM_META[deal.platform];
             return (
-              <tr key={deal.id} className="group border-b border-border/60 transition-colors hover:bg-muted/30">
+              <tr
+                key={deal.id}
+                onClick={() => onSelect(deal.id)}
+                data-selected={deal.id === selectedId}
+                className={cn(
+                  "group cursor-pointer border-b border-border/60 transition-colors hover:bg-muted/30",
+                  deal.id === selectedId && "bg-muted/40"
+                )}
+              >
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2.5">
                     <div className="grid size-6 shrink-0 place-items-center rounded bg-[#333333] text-[10px] font-bold text-[#f0f0f0]">
