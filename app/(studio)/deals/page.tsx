@@ -1,4 +1,4 @@
-import { getDeals } from "@/app/actions/deals";
+import { getCurrentUserId, getDeals } from "@/app/actions/deals";
 import { DealsView } from "@/components/deals/deals-view";
 
 export default async function DealsPage({
@@ -7,6 +7,8 @@ export default async function DealsPage({
   searchParams: Promise<{ new?: string }>;
 }) {
   const { new: isNew } = await searchParams;
-  const deals = await getDeals();
-  return <DealsView autoOpenNew={isNew === "1"} initialDeals={deals} />;
+  const [deals, userId] = await Promise.all([getDeals(), getCurrentUserId()]);
+  return (
+    <DealsView autoOpenNew={isNew === "1"} initialDeals={deals} userId={userId} />
+  );
 }

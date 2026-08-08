@@ -7,20 +7,19 @@ import {
   type DealStage,
   type DealStatus,
 } from "@/lib/mock-data";
+import {
+  isBadgeType,
+  isDealDbStatus,
+  toDbStatus,
+  toUiDeal,
+  UI_STATUS_BY_STAGE,
+} from "@/lib/deal-mapping";
 
-export type DealDbStatus = "INBOX" | "IN_PROGRESS" | "CLOSED_WIN" | "DECLINED";
-
-export type BadgeType = "HIGH BUDGET" | "NEEDS INFO" | "GIFTING";
-
-export interface SponsorshipDeal {
-  id: string;
-  user_id: string;
-  brand_name: string;
-  deal_amount: number;
-  status: DealDbStatus;
-  badge_type: BadgeType | null;
-  created_at: string;
-}
+export type {
+  BadgeType,
+  DealDbStatus,
+  SponsorshipDeal,
+} from "@/lib/deal-mapping";
 
 export interface NewDealInput {
   brand: string;
@@ -35,87 +34,11 @@ export type DealMutationState = {
   error?: string;
 };
 
-const DB_STATUS_TO_STAGE: Record<DealDbStatus, DealStage> = {
-  INBOX: "conversation",
-  IN_PROGRESS: "rate-lock",
-  CLOSED_WIN: "completed",
-  DECLINED: "completed",
-};
-
-const UI_STATUS_BY_STAGE: Record<DealStage, DealStatus> = {
-  conversation: "Active",
-  "rate-lock": "Review",
-  deliverable: "Uploaded",
-  "payment-due": "Invoiced",
-  completed: "Paid",
-};
-
-const BADGE_DELIVERABLES: Record<BadgeType, string> = {
-  "HIGH BUDGET": "High-budget partnership",
-  "NEEDS INFO": "Needs more info",
-  GIFTING: "Gifting arrangement",
-};
-
-const DEAL_DB_STATUSES: DealDbStatus[] = [
-  "INBOX",
-  "IN_PROGRESS",
-  "CLOSED_WIN",
-  "DECLINED",
-];
-
-const BADGE_TYPES: BadgeType[] = ["HIGH BUDGET", "NEEDS INFO", "GIFTING"];
-
 function isSupabaseConfigured() {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
-}
-
-function isDealDbStatus(value: string): value is DealDbStatus {
-  return (DEAL_DB_STATUSES as string[]).includes(value);
-}
-
-function isBadgeType(value: string): value is BadgeType {
-  return (BADGE_TYPES as string[]).includes(value);
-}
-
-function toDbStatus(stage: DealStage, status: DealStatus): DealDbStatus {
-  if (status === "Closed") return "DECLINED";
-  if (stage === "completed") return "CLOSED_WIN";
-  return "IN_PROGRESS";
-}
-
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const minutes = Math.max(1, Math.floor(diffMs / 60_000));
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function toUiDeal(row: SponsorshipDeal): Deal {
-  const stage = DB_STATUS_TO_STAGE[row.status];
-  const status =
-    row.status === "DECLINED" ? "Closed" : UI_STATUS_BY_STAGE[stage];
-  return {
-    id: row.id,
-    brand: row.brand_name,
-    initials: row.brand_name.slice(0, 2).toUpperCase(),
-    value: row.deal_amount,
-    platform: "Email",
-    stage,
-    status,
-    deadline: "TBD",
-    deliverables: row.badge_type ? BADGE_DELIVERABLES[row.badge_type] : "—",
-    lastActivity: timeAgo(row.created_at),
-  };
 }
 
 function fallbackDeal(input: NewDealInput): Deal {
@@ -132,6 +55,23 @@ function fallbackDeal(input: NewDealInput): Deal {
     deliverables: input.deliverables?.trim() || "TBD",
     lastActivity: "just now",
   };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Session helpers                                                    */
+/* ------------------------------------------------------------------ */
+
+export async function getCurrentUserId(): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return user?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /* ------------------------------------------------------------------ */

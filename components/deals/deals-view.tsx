@@ -33,6 +33,7 @@ import {
   type Platform,
   type DealStatus,
 } from "@/lib/mock-data";
+import { useRealtimeDeals } from "@/hooks/useRealtimeDeals";
 
 const COLUMN_META: Record<DealStage, { dot: string; icon: React.ReactNode }> = {
   conversation: { dot: "bg-[#a0a0a0]", icon: null },
@@ -84,12 +85,14 @@ function formatCurrency(value: number) {
 export function DealsView({
   autoOpenNew,
   initialDeals,
+  userId,
 }: {
   autoOpenNew: boolean;
   initialDeals: Deal[];
+  userId: string | null;
 }) {
   const router = useRouter();
-  const [deals, setDeals] = useState<Deal[]>(initialDeals);
+  const { deals, setDeals } = useRealtimeDeals(initialDeals, userId);
   const [view, setView] = useState<"board" | "table">("board");
   const [dialogOpen, setDialogOpen] = useState(autoOpenNew);
   const [selectedId, setSelectedId] = useState<string | null>(null);
