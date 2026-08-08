@@ -30,8 +30,19 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id)
-  values (new.id);
+  insert into public.profiles (id, full_name, selected_theme)
+  values (
+    new.id,
+    coalesce(
+      new.raw_user_meta_data ->> 'full_name',
+      new.raw_user_meta_data ->> 'name',
+      new.raw_user_meta_data ->> 'user_name',
+      ''
+    ),
+    'emerald'
+  )
+  on conflict (id) do nothing;
+
   return new;
 end;
 $$;

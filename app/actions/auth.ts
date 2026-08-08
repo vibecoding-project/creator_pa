@@ -60,7 +60,7 @@ export async function signup(
 
   const origin = await getOrigin();
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -71,6 +71,35 @@ export async function signup(
 
   if (error) {
     return { error: error.message };
+  }
+
+  // Safety check: the on_auth_user_created trigger normally inserts the
+  // public.profiles row for us. If it did not fire (e.g. migration not yet
+  // applied) and a session already exists, create the row here. This is
+  // best-effort: when email confirmation is enabled there is no session
+  // yet, so the trigger is the source of truth until the link is clicked.
+  if (data.user) {
+    try {
+      const {
+        data: { user: sessionUser },
+      } = await supabase.auth.getUser();
+      if (sessionUser) {
+        const { data: existing } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", data.user.id)
+          .maybeSingle();
+
+        if (!existing) {
+          await supabase.from("profiles").upsert(
+            { id: data.user.id, full_name: fullName || null },
+            { onConflict: "id" }
+          );
+        }
+      }
+    } catch {
+      // Ignore — the trigger remains the primary mechanism.
+    }
   }
 
   return { ok: true };

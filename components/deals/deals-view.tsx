@@ -13,9 +13,10 @@ import {
   Timer,
   CircleDollarSign,
   Trophy,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { createDeal, updateDealStatus } from "@/app/actions/deals";
+import { createDeal, deleteDeal, updateDealStatus } from "@/app/actions/deals";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -136,8 +137,19 @@ export function DealsView({
       deliverables: deal.deliverables,
     });
     setDeals((prev) =>
-      prev.map((d) => (d.id === deal.id ? created : d))
+      created
+        ? prev.map((d) => (d.id === deal.id ? created : d))
+        : prev.filter((d) => d.id !== deal.id)
     );
+  };
+
+  const removeDeal = async (id: string) => {
+    setDeals((prev) => prev.filter((d) => d.id !== id));
+    const res = await deleteDeal(id);
+    if (!res.ok) {
+      // The delete was blocked (RLS/network) — restore the server state.
+      router.refresh();
+    }
   };
 
   return (
@@ -222,6 +234,7 @@ export function DealsView({
             selectedId={selectedId}
             onSelect={setSelectedId}
             onMove={moveDeal}
+            onDelete={removeDeal}
           />
         ) : (
           <TableView
@@ -280,11 +293,13 @@ function Board({
   selectedId,
   onSelect,
   onMove,
+  onDelete,
 }: {
   deals: Deal[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onMove: (id: string, s: DealStage) => void;
+  onDelete: (id: string) => void;
 }) {
   return (
     <div className="flex h-full gap-4 overflow-x-auto pb-2 scrollbar-slim">
@@ -322,6 +337,7 @@ function Board({
                     selected={deal.id === selectedId}
                     onSelect={onSelect}
                     onMove={onMove}
+                    onDelete={onDelete}
                   />
                 ))
               )}
@@ -338,11 +354,13 @@ function DealCard({
   selected,
   onSelect,
   onMove,
+  onDelete,
 }: {
   deal: Deal;
   selected: boolean;
   onSelect: (id: string) => void;
   onMove: (id: string, s: DealStage) => void;
+  onDelete: (id: string) => void;
 }) {
   const platform = PLATFORM_META[deal.platform];
   const idx = STAGE_ORDER.indexOf(deal.stage);
@@ -405,6 +423,14 @@ function DealCard({
             >
               <ArrowRight className="size-3.5" />
               Advance {next ? `→ ${STAGES[idx + 1].short}` : "— complete"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => onDelete(deal.id)}
+            >
+              <Trash2 className="size-3.5" />
+              Delete deal
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

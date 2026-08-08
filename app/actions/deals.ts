@@ -30,6 +30,11 @@ export interface NewDealInput {
   deliverables?: string;
 }
 
+export type DealMutationState = {
+  ok: boolean;
+  error?: string;
+};
+
 const DB_STATUS_TO_STAGE: Record<DealDbStatus, DealStage> = {
   INBOX: "conversation",
   IN_PROGRESS: "rate-lock",
@@ -51,11 +56,28 @@ const BADGE_DELIVERABLES: Record<BadgeType, string> = {
   GIFTING: "Gifting arrangement",
 };
 
+const DEAL_DB_STATUSES: DealDbStatus[] = [
+  "INBOX",
+  "IN_PROGRESS",
+  "CLOSED_WIN",
+  "DECLINED",
+];
+
+const BADGE_TYPES: BadgeType[] = ["HIGH BUDGET", "NEEDS INFO", "GIFTING"];
+
 function isSupabaseConfigured() {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
+}
+
+function isDealDbStatus(value: string): value is DealDbStatus {
+  return (DEAL_DB_STATUSES as string[]).includes(value);
+}
+
+function isBadgeType(value: string): value is BadgeType {
+  return (BADGE_TYPES as string[]).includes(value);
 }
 
 function toDbStatus(stage: DealStage, status: DealStatus): DealDbStatus {
@@ -112,21 +134,43 @@ function fallbackDeal(input: NewDealInput): Deal {
   };
 }
 
+/* ------------------------------------------------------------------ */
+/*  Reads                                                              */
+/* ------------------------------------------------------------------ */
+
 export async function getDeals(): Promise<Deal[]> {
+  // Demo mode: no Supabase configured — show the seed pipeline.
   if (!isSupabaseConfigured()) return seedDeals;
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Should never happen (proxy protects these routes) — never leak mock
+  // data to an unauthenticated request.
+  if (!user) return [];
+
   const { data, error } = await supabase
     .from("sponsorship_deals")
     .select("id, user_id, brand_name, deal_amount, status, badge_type, created_at")
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
-  if (error || !data || data.length === 0) return seedDeals;
+  // RLS blocks or any other query failure → return an empty state rather
+  // than mock rows. The row-level policies already scope the query to
+  // auth.uid() = user_id; the explicit filter is defense in depth.
+  if (error || !data) return [];
 
   return data.map(toUiDeal);
 }
 
-export async function createDeal(input: NewDealInput): Promise<Deal> {
+/* ------------------------------------------------------------------ */
+/*  Writes                                                            */
+/* ------------------------------------------------------------------ */
+
+export async function createDeal(input: NewDealInput): Promise<Deal | null> {
+  // Demo mode: no Supabase configured — return a local optimistic deal.
   if (!isSupabaseConfigured()) return fallbackDeal(input);
 
   const supabase = await createClient();
@@ -134,7 +178,7 @@ export async function createDeal(input: NewDealInput): Promise<Deal> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) return fallbackDeal(input);
+  if (!user) return null;
 
   const { data, error } = await supabase
     .from("sponsorship_deals")
@@ -148,7 +192,9 @@ export async function createDeal(input: NewDealInput): Promise<Deal> {
     .select("id, user_id, brand_name, deal_amount, status, badge_type, created_at")
     .single();
 
-  if (error || !data) return fallbackDeal(input);
+  // Null means the insert was rejected (e.g. RLS policy violation) — the
+  // caller should roll back its optimistic update.
+  if (error || !data) return null;
 
   return toUiDeal(data);
 }
@@ -157,14 +203,84 @@ export async function updateDealStatus(
   id: string,
   stage: DealStage,
   status: DealStatus
-): Promise<{ ok: boolean }> {
+): Promise<DealMutationState> {
   if (!isSupabaseConfigured()) return { ok: true };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { ok: false, error: "Not authenticated" };
+
   const { error } = await supabase
     .from("sponsorship_deals")
     .update({ status: toDbStatus(stage, status) })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", user.id);
 
-  return { ok: !error };
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function updateDeal(
+  dealId: string,
+  formData: FormData
+): Promise<DealMutationState> {
+  if (!isSupabaseConfigured()) return { ok: true };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { ok: false, error: "Not authenticated" };
+
+  const brandName = String(formData.get("brand_name") ?? "").trim();
+  const amountRaw = String(formData.get("deal_amount") ?? "").trim();
+  const status = String(formData.get("status") ?? "").trim();
+  const badgeRaw = String(formData.get("badge_type") ?? "").trim();
+
+  const patch: Record<string, string | number | null> = {};
+  if (brandName) patch.brand_name = brandName;
+  const amount = Number(amountRaw);
+  if (amountRaw !== "" && !Number.isNaN(amount) && amount >= 0) {
+    patch.deal_amount = amount;
+  }
+  if (isDealDbStatus(status)) patch.status = status;
+  if (isBadgeType(badgeRaw)) patch.badge_type = badgeRaw;
+  else if (badgeRaw === "") patch.badge_type = null;
+
+  if (Object.keys(patch).length === 0) return { ok: true };
+
+  // Update is scoped to both id AND user_id; RLS enforces the same
+  // condition server-side.
+  const { error } = await supabase
+    .from("sponsorship_deals")
+    .update(patch)
+    .eq("id", dealId)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function deleteDeal(dealId: string): Promise<DealMutationState> {
+  if (!isSupabaseConfigured()) return { ok: true };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { ok: false, error: "Not authenticated" };
+
+  const { error } = await supabase
+    .from("sponsorship_deals")
+    .delete()
+    .eq("id", dealId)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
