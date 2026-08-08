@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
 import {
   Inbox,
   Layers,
@@ -11,7 +12,7 @@ import {
   Plus,
   ChevronsLeft,
   ChevronsRight,
-  Users,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/brand-mark";
@@ -21,7 +22,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { creatorProfile } from "@/lib/mock-data";
+import { logout } from "@/app/actions/auth";
 import { PlanProvider } from "@/components/billing/plan-store";
 import { UsageBar } from "@/components/billing/usage-bar";
 import { PricingModal } from "@/components/billing/pricing-modal";
@@ -33,9 +34,28 @@ const NAV_ITEMS = [
   { href: "/settings", label: "Settings / Matrix", icon: Settings2 },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  user,
+  children,
+}: {
+  user?: User | null;
+  children: React.ReactNode;
+}) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
+
+  const fullName = (user?.user_metadata?.full_name as string | undefined) ?? "";
+  const displayName =
+    fullName || (user?.email ? user.email.split("@")[0] : "Creator");
+  const email = user?.email ?? "studio user";
+  const initials = (
+    displayName
+      .split(" ")
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2) || "?"
+  ).toUpperCase();
 
   return (
     <PlanProvider>
@@ -191,26 +211,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           <Avatar className="size-8">
             <AvatarFallback className="bg-[#333333] text-[11px] font-semibold text-[#f0f0f0]">
-              {creatorProfile.initials}
+              {initials}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
             <>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[12px] font-medium leading-tight">
-                  {creatorProfile.name}
+                  {displayName}
                 </p>
                 <p className="truncate text-[10px] text-muted-foreground">
-                  {creatorProfile.handle}
+                  {email}
                 </p>
               </div>
-              <span
-                className="flex shrink-0 items-center gap-1 rounded-none bg-foreground/10 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground"
-                title={`${creatorProfile.followers.toLocaleString()} followers`}
-              >
-                <Users className="size-2.5" />
-                {creatorProfile.followerLabel}
-              </span>
+              {user && (
+                <form action={logout} title="Sign out">
+                  <button
+                    type="submit"
+                    aria-label="Sign out"
+                    className="grid size-6 shrink-0 cursor-pointer place-items-center rounded-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <LogOut className="size-3.5" />
+                  </button>
+                </form>
+              )}
             </>
           )}
         </div>
